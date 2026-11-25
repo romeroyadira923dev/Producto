@@ -1,0 +1,69 @@
+Manual de usuario: Control del negocio
+25 de noviembre de 2026 · Yadira Romero Rodriguez
+Este manual explica cómo usar la app de control del negocio para llevar inventario y registrar compras, ventas y ajustes en tiempo real.
+Primeros pasos
+Abre la app en el navegador del equipo donde trabajará el negocio. Los datos se guardan solo en ese navegador, así que use siempre el mismo.
+1.	Vaya a Productos y agregue cada producto con su unidad (por ejemplo, "saco 50 kg"), su precio de venta y su stock mínimo.
+2.	Vaya a Movimientos y registre una compra por cada producto. Así entra el stock y se calcula el costo.
+3.	Registre las ventas a medida que ocurran. El stock baja solo.
+4.	Revise Resumen para ver el estado del negocio.
+Resumen
+La pantalla de Resumen se actualiza al guardar cada movimiento. Muestra seis indicadores:
+•	Valor del inventario: stock de cada producto multiplicado por su costo promedio.
+•	Unidades en stock: suma de unidades de todos los productos.
+•	Ventas: suma de cantidad por precio de venta de todas las ventas.
+•	Utilidad bruta: ventas menos el costo de lo vendido.
+•	Margen: utilidad bruta dividida entre ventas.
+•	Bajo mínimo: cantidad de productos con stock igual o menor a su mínimo.
+Debajo aparecen los productos bajo mínimo y los últimos seis movimientos.
+Productos
+Agregue un producto con el formulario "Nuevo producto". Solo el nombre es obligatorio. No puede haber dos productos con el mismo nombre.
+En la tabla puede cambiar directamente el precio de venta y el mínimo de cada producto. Los cambios se guardan al salir del campo.
+El estado se calcula solo:
+Estado	Significado
+OK	El stock está por encima del mínimo.
+Bajo	El stock es igual o menor al mínimo, y el mínimo es mayor que cero.
+Agotado	El stock es cero o menor.
+
+El botón Borrar solo aparece en productos sin movimientos. Para borrar un producto con historial, primero hay que quitar sus movimientos. Para confirmar un borrado, pulse el botón dos veces.
+Movimientos
+Cada movimiento cambia el stock al instante. Hay tres tipos:
+Tipo	Efecto en el stock	Precio que pide	Uso
+Compra	Suma la cantidad	Costo unitario	Mercancía que llega al negocio.
+Venta	Resta la cantidad	Precio de venta	Mercancía que sale por una venta.
+Ajuste	Fija el stock al valor contado	No aplica	Corregir el stock tras un conteo físico.
+
+Campos del formulario: tipo, fecha, producto, cantidad, precio y proveedor o nota. La fecha es obligatoria. El proveedor o nota es opcional, pero conviene escribirlo: se usa en la pestaña Comparar.
+Reglas que la app aplica:
+•	La cantidad debe ser mayor que cero. En un ajuste puede ser cero.
+•	No se puede vender más de lo que había en stock en esa fecha. La app lo rechaza y muestra la cantidad disponible.
+•	El costo de cada producto es un promedio ponderado de sus compras. Cada compra recalcula ese promedio.
+•	Cada venta guarda el costo promedio del momento en que se hizo. Así la utilidad no cambia si luego compra a otro precio.
+•	Para borrar un movimiento, pulse Borrar dos veces. La app lo rechaza si el borrado dejaría una venta posterior sin stock.
+Comparar
+Elija un producto en el selector. La pantalla muestra sus compras en orden de fecha, con su proveedor o nota y el costo unitario.
+Los indicadores son:
+•	Compra más barata y compra más cara: menor y mayor costo unitario registrado.
+•	Última compra: costo unitario de la compra más reciente.
+•	Promedio ponderado: total pagado dividido entre todas las unidades compradas.
+•	Precio de venta: el precio configurado en Productos.
+•	Última venta: precio de la venta más reciente.
+La columna Vs. compra anterior muestra el cambio porcentual del costo frente a la compra previa. Un valor positivo significa que el precio subió.
+Para comparar proveedores, escriba el nombre en el campo de proveedor o nota de cada compra.
+Datos y copias de seguridad
+Los datos viven en el navegador. Si borra los datos del navegador o cambia de equipo, pierde la información. Haga una copia de seguridad periódicamente.
+Copiar (pestaña Datos): muestra todos los datos en formato de texto (JSON). Pulse Copiar y pegue el texto en un documento o nota para guardarlo. Si el botón no funciona, seleccione el texto a mano y cópielo.
+Importar: pegue una copia guardada en el cuadro de importación y pulse Reemplazar datos dos veces. La app reemplaza todo lo que tenga guardado. La importación se rechaza si el texto no es válido o si contiene movimientos de productos inexistentes.
+Los datos de comparación de precios se pueden importar con este mismo formato.
+Problemas frecuentes y límites
+Situación	Qué hacer
+La app rechaza una venta por falta de stock	Revise en Movimientos si falta una compra anterior o si la fecha de la venta es correcta.
+Una cifra no cuadra con el conteo físico	Registre un ajuste con el stock contado.
+Los datos desaparecieron	Puede que el navegador haya borrado los datos del sitio. Importe la última copia desde la pestaña Datos.
+Aparece un aviso de que el navegador no permite guardar	Los datos solo viven mientras la pestaña esté abierta. Copie los datos antes de cerrarla.
+
+Límites actuales:
+•	Los datos no se sincronizan entre equipos ni entre navegadores.
+•	Los montos se muestran sin símbolo de moneda.
+•	La app no genera archivos. La copia de seguridad es texto que se copia y se pega.
+•	El cálculo de utilidad es bruto: no incluye gastos, impuestos ni costos fijos.
