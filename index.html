@@ -1,0 +1,478 @@
+<title>Control del negocio</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: one column, tab bar on top, plain cards for each block of data. */
+:root{
+  --bg:#f5f4f0; --panel:#ffffff; --fg:#1c1e1b; --muted:#666a62; --line:#dcdbd3;
+  --accent:#2c6a4f; --accent-fg:#ffffff; --warn:#9a5210; --bad:#a83232; --ok:#2c6a4f;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#151714; --panel:#1e211d; --fg:#ebeae4; --muted:#9ba097; --line:#2d312c;
+    --accent:#7cc2a0; --accent-fg:#10231a; --warn:#e3a465; --bad:#e58080; --ok:#7cc2a0;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#151714; --panel:#1e211d; --fg:#ebeae4; --muted:#9ba097; --line:#2d312c;
+  --accent:#7cc2a0; --accent-fg:#10231a; --warn:#e3a465; --bad:#e58080; --ok:#7cc2a0;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--bg); color:var(--fg);
+  font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  padding-block:16px;
+  padding-left:max(16px, env(safe-area-inset-left,0px));
+  padding-right:max(16px, env(safe-area-inset-right,0px));
+}
+[hidden]{display:none!important}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+h1{font-size:20px; margin:0 0 12px; letter-spacing:-.01em}
+h2{font-size:15px; margin:0 0 10px}
+nav{display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; margin-bottom:12px}
+nav button{
+  flex:0 0 auto; font:inherit; color:var(--fg); background:var(--panel);
+  border:1px solid var(--line); border-radius:8px; padding:8px 12px; cursor:pointer;
+}
+nav button[aria-pressed="true"]{background:var(--accent); color:var(--accent-fg); border-color:var(--accent)}
+.card{background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px; margin-bottom:12px; min-width:0}
+.grid{display:grid; gap:10px; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); margin-bottom:12px}
+.tile{margin:0}
+.tile .label{color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.04em}
+.tile .val{font-size:20px; font-weight:650; font-variant-numeric:tabular-nums; margin-top:4px}
+.row{display:grid; gap:10px; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); align-items:end}
+label{display:flex; flex-direction:column; gap:4px; font-size:13px; color:var(--muted); min-width:0}
+input,select,textarea{
+  font:inherit; color:var(--fg); background:var(--bg); border:1px solid var(--line);
+  border-radius:7px; padding:8px 10px; min-width:0; width:100%;
+}
+input:disabled{opacity:.5}
+textarea{font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12px; min-height:140px}
+button.primary{background:var(--accent); color:var(--accent-fg); border:0; border-radius:7px; padding:9px 14px; font:inherit; font-weight:600; cursor:pointer}
+button.ghost{background:transparent; color:var(--fg); border:1px solid var(--line); border-radius:7px; padding:6px 10px; font:inherit; cursor:pointer}
+button.danger{color:var(--bad)}
+.table-wrap{overflow-x:auto}
+table{width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums}
+th,td{text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); white-space:nowrap}
+th{font-size:12px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.04em}
+.num{text-align:right}
+td input{width:96px; padding:5px 7px; text-align:right}
+.pill{display:inline-block; font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid currentColor}
+.pill.ok{color:var(--ok)} .pill.low{color:var(--warn)} .pill.out{color:var(--bad)}
+.empty{color:var(--muted); margin:6px 0}
+.line{padding:6px 0; border-bottom:1px solid var(--line)}
+.line:last-child{border-bottom:0}
+.muted{color:var(--muted)}
+#notice{min-height:20px; font-size:13px; color:var(--fg); margin:0 0 8px}
+#persist{font-size:13px; color:var(--warn); margin:0 0 10px}
+.actions{display:flex; gap:8px; flex-wrap:wrap; margin-top:10px}
+</style>
+
+<header>
+  <h1>Control del negocio</h1>
+  <p id="persist" hidden></p>
+  <nav aria-label="Secciones">
+    <button data-tab="resumen">Resumen</button>
+    <button data-tab="productos">Productos</button>
+    <button data-tab="movimientos">Movimientos</button>
+    <button data-tab="comparar">Comparar</button>
+    <button data-tab="datos">Datos</button>
+  </nav>
+  <div id="notice" role="status" aria-live="polite"></div>
+</header>
+
+<main>
+  <section id="sec-resumen">
+    <div class="grid" id="tiles"></div>
+    <div class="card"><h2>Stock bajo</h2><div id="low"></div></div>
+    <div class="card"><h2>Últimos movimientos</h2><div id="recent"></div></div>
+  </section>
+
+  <section id="sec-productos" hidden>
+    <div class="card">
+      <h2>Nuevo producto</h2>
+      <form id="f-prod">
+        <div class="row">
+          <label>Nombre<input name="name" maxlength="80" placeholder="Azúcar blanca" required></label>
+          <label>Unidad<input name="unit" maxlength="30" placeholder="saco 50 kg"></label>
+          <label>Precio de venta<input name="price" type="number" min="0" step="0.01" value="0"></label>
+          <label>Stock mínimo<input name="min" type="number" min="0" step="0.001" value="0"></label>
+          <button class="primary" type="submit">Agregar</button>
+        </div>
+      </form>
+    </div>
+    <div class="card"><h2>Productos</h2><div class="table-wrap" id="prod-table"></div></div>
+  </section>
+
+  <section id="sec-movimientos" hidden>
+    <div class="card">
+      <h2>Registrar movimiento</h2>
+      <form id="f-move">
+        <div class="row">
+          <label>Tipo
+            <select name="type" id="m-type">
+              <option value="compra">Compra (entra stock)</option>
+              <option value="venta">Venta (sale stock)</option>
+              <option value="ajuste">Ajuste de inventario</option>
+            </select>
+          </label>
+          <label>Fecha<input name="date" id="m-date" type="date" required></label>
+          <label>Producto<select name="product" id="m-product" required></select></label>
+          <label><span id="lbl-qty">Cantidad</span><input name="qty" type="number" min="0" step="0.001" required></label>
+          <label><span id="lbl-price">Costo unitario</span><input name="price" id="m-price" type="number" min="0" step="0.01"></label>
+          <label>Proveedor o nota<input name="note" maxlength="120" placeholder="Opcional"></label>
+          <button class="primary" type="submit">Guardar</button>
+        </div>
+      </form>
+    </div>
+    <div class="card"><h2>Historial</h2><div class="table-wrap" id="move-table"></div></div>
+  </section>
+
+  <section id="sec-comparar" hidden>
+    <div class="card">
+      <label>Producto a comparar<select id="cmp-prod"></select></label>
+    </div>
+    <div class="grid" id="cmp-tiles"></div>
+    <div class="card"><h2>Compras de este producto</h2><div class="table-wrap" id="cmp-table"></div></div>
+  </section>
+
+  <section id="sec-datos" hidden>
+    <div class="card">
+      <h2>Copia de seguridad</h2>
+      <p class="muted">Los datos se guardan en este navegador. Copia este texto y guárdalo; sirve para restaurar o pasar la información a otro dispositivo.</p>
+      <textarea id="exp" readonly aria-label="Datos exportados"></textarea>
+      <div class="actions"><button class="ghost" id="copy" type="button">Copiar</button></div>
+    </div>
+    <div class="card">
+      <h2>Importar</h2>
+      <p class="muted">Pega aquí una copia guardada. Reemplaza todos los datos actuales. Así también entrarán después los datos de comparación de precios.</p>
+      <textarea id="imp" aria-label="Datos a importar"></textarea>
+      <div class="actions"><button class="ghost danger" id="imp-btn" type="button" data-label="Reemplazar datos">Reemplazar datos</button></div>
+    </div>
+  </section>
+</main>
+
+<script>
+const KEY = "control-negocio-v1";
+const TYPE = {compra:"Compra", venta:"Venta", ajuste:"Ajuste"};
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt = n => Number(n || 0).toLocaleString("es", {minimumFractionDigits:2, maximumFractionDigits:2});
+const num = n => Number(n || 0).toLocaleString("es", {maximumFractionDigits:3});
+const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+const today = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0"); };
+
+let persisted = true;
+let db = load();
+
+function valid(d){ return d && Array.isArray(d.products) && Array.isArray(d.moves); }
+function load(){
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) { const d = JSON.parse(raw); if (valid(d)) return d; }
+  } catch (e) { persisted = false; }
+  return {products:[], moves:[], seq:0};
+}
+function save(){
+  try { localStorage.setItem(KEY, JSON.stringify(db)); persisted = true; }
+  catch (e) { persisted = false; }
+  renderAll();
+}
+function notice(t){
+  const n = $("#notice");
+  n.textContent = t;
+  clearTimeout(notice.timer);
+  notice.timer = setTimeout(() => { n.textContent = ""; }, 5000);
+}
+function pname(id){ const p = db.products.find(x => x.id === id); return p ? p.name : "(eliminado)"; }
+function sortedMoves(){
+  return db.moves.slice().sort((a,b) => b.date.localeCompare(a.date) || b.seq - a.seq);
+}
+
+/* Recalculates stock and average cost by replaying every movement in date order.
+   This keeps numbers exact when a movement is added or removed. */
+function replay(moves){
+  const st = {}, info = {};
+  db.products.forEach(p => { st[p.id] = {qty:0, cost:0}; });
+  const ordered = moves.slice().sort((a,b) => a.date.localeCompare(b.date) || a.seq - b.seq);
+  for (const m of ordered) {
+    const s = st[m.productId];
+    if (!s) return {st, info, error:"Hay un movimiento de un producto que ya no existe."};
+    if (m.type === "compra") {
+      const total = s.qty + m.qty;
+      s.cost = total > 0 ? (s.qty * s.cost + m.qty * m.unit) / total : m.unit;
+      s.qty = total;
+      info[m.id] = {cost: m.unit};
+    } else if (m.type === "venta") {
+      if (m.qty > s.qty) return {st, info, error:`No hay stock suficiente de ${pname(m.productId)} el ${m.date}. Quedaban ${num(s.qty)}.`};
+      s.qty -= m.qty;
+      info[m.id] = {cost: s.cost};
+    } else if (m.type === "ajuste") {
+      s.qty = m.qty;
+      info[m.id] = {cost: s.cost};
+    }
+  }
+  return {st, info, error:null};
+}
+function current(){ return replay(db.moves); }
+
+function addMove(m){
+  m.id = uid(); m.seq = db.seq + 1;
+  const trial = db.moves.concat([m]);
+  const r = replay(trial);
+  if (r.error) return r.error;
+  db.seq += 1; db.moves = trial; save();
+  return null;
+}
+function removeMove(id){
+  const trial = db.moves.filter(m => m.id !== id);
+  const r = replay(trial);
+  if (r.error) return r.error;
+  db.moves = trial; save();
+  return null;
+}
+
+function renderSummary(){
+  const r = current();
+  let inv = 0, units = 0; const low = [];
+  db.products.forEach(p => {
+    const s = r.st[p.id]; inv += s.qty * s.cost; units += s.qty;
+    if (p.min > 0 && s.qty <= p.min) low.push(p);
+  });
+  let sales = 0, cogs = 0;
+  db.moves.forEach(m => {
+    if (m.type === "venta") { sales += m.qty * m.unit; cogs += m.qty * ((r.info[m.id] || {}).cost || 0); }
+  });
+  const profit = sales - cogs;
+  const margin = sales > 0 ? profit / sales * 100 : null;
+  const tile = (l, v) => `<div class="card tile"><div class="label">${l}</div><div class="val">${v}</div></div>`;
+  $("#tiles").innerHTML =
+    tile("Valor del inventario", fmt(inv)) +
+    tile("Unidades en stock", num(units)) +
+    tile("Ventas", fmt(sales)) +
+    tile("Utilidad bruta", fmt(profit)) +
+    tile("Margen", margin === null ? "—" : margin.toFixed(1) + " %") +
+    tile("Bajo mínimo", String(low.length));
+  $("#low").innerHTML = !db.products.length
+    ? '<p class="empty">Todavía no hay productos. Agrega el primero en la pestaña Productos.</p>'
+    : low.length
+      ? low.map(p => `<div class="line">${esc(p.name)}: ${num(r.st[p.id].qty)} (mínimo ${num(p.min)})</div>`).join("")
+      : '<p class="empty">Ningún producto está bajo su mínimo.</p>';
+  const recent = sortedMoves().slice(0, 6);
+  $("#recent").innerHTML = recent.length
+    ? recent.map(m => `<div class="line">${esc(m.date)} · ${TYPE[m.type]} · ${esc(pname(m.productId))} · ${num(m.qty)}</div>`).join("")
+    : '<p class="empty">Todavía no hay movimientos.</p>';
+}
+
+function renderProducts(){
+  const r = current();
+  if (!db.products.length) { $("#prod-table").innerHTML = '<p class="empty">Sin productos todavía.</p>'; return; }
+  const rows = db.products.map(p => {
+    const s = r.st[p.id];
+    const used = db.moves.some(m => m.productId === p.id);
+    const state = s.qty <= 0 ? '<span class="pill out">Agotado</span>'
+      : (p.min > 0 && s.qty <= p.min) ? '<span class="pill low">Bajo</span>'
+      : '<span class="pill ok">OK</span>';
+    return `<tr>
+      <td>${esc(p.name)}</td><td>${esc(p.unit)}</td>
+      <td class="num">${num(s.qty)}</td><td class="num">${fmt(s.cost)}</td>
+      <td class="num"><input type="number" min="0" step="0.01" value="${Number(p.price) || 0}" data-f="price" data-id="${p.id}" aria-label="Precio de venta de ${esc(p.name)}"></td>
+      <td class="num"><input type="number" min="0" step="0.001" value="${Number(p.min) || 0}" data-f="min" data-id="${p.id}" aria-label="Stock mínimo de ${esc(p.name)}"></td>
+      <td>${state}</td>
+      <td>${used ? "" : `<button class="ghost danger" data-act="delprod" data-id="${p.id}">Borrar</button>`}</td>
+    </tr>`;
+  }).join("");
+  $("#prod-table").innerHTML = `<table><thead><tr>
+    <th>Producto</th><th>Unidad</th><th class="num">Stock</th><th class="num">Costo prom.</th>
+    <th class="num">Precio venta</th><th class="num">Mínimo</th><th>Estado</th><th></th>
+    </tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function renderMoves(){
+  const list = sortedMoves();
+  if (!list.length) { $("#move-table").innerHTML = '<p class="empty">Sin movimientos. Registra una compra para cargar stock o una venta para descontarlo.</p>'; return; }
+  const rows = list.map(m => {
+    const adj = m.type === "ajuste";
+    return `<tr>
+      <td>${esc(m.date)}</td><td>${TYPE[m.type]}</td><td>${esc(pname(m.productId))}</td>
+      <td class="num">${adj ? "Contado: " + num(m.qty) : num(m.qty)}</td>
+      <td class="num">${adj ? "—" : fmt(m.unit)}</td>
+      <td class="num">${adj ? "—" : fmt(m.qty * m.unit)}</td>
+      <td>${esc(m.note)}</td>
+      <td><button class="ghost danger" data-act="delmove" data-id="${m.id}">Borrar</button></td>
+    </tr>`;
+  }).join("");
+  $("#move-table").innerHTML = `<table><thead><tr>
+    <th>Fecha</th><th>Tipo</th><th>Producto</th><th class="num">Cantidad</th>
+    <th class="num">Precio / costo</th><th class="num">Total</th><th>Proveedor / nota</th><th></th>
+    </tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function renderMoveForm(){
+  const sel = $("#m-product"), prev = sel.value;
+  sel.innerHTML = db.products.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join("")
+    || '<option value="">Crea un producto primero</option>';
+  if (db.products.some(p => p.id === prev)) sel.value = prev;
+  const t = $("#m-type").value;
+  $("#lbl-price").textContent = t === "compra" ? "Costo unitario" : "Precio de venta";
+  $("#lbl-qty").textContent = t === "ajuste" ? "Stock contado" : "Cantidad";
+  $("#m-price").disabled = t === "ajuste";
+}
+
+function renderCompare(){
+  const sel = $("#cmp-prod"), prev = sel.value;
+  sel.innerHTML = db.products.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join("");
+  if (!db.products.length) {
+    $("#cmp-tiles").innerHTML = "";
+    $("#cmp-table").innerHTML = '<p class="empty">Agrega productos y registra sus compras para compararlas aquí.</p>';
+    return;
+  }
+  const id = db.products.some(p => p.id === prev) ? prev : db.products[0].id;
+  sel.value = id;
+  const byDate = (a,b) => a.date.localeCompare(b.date) || a.seq - b.seq;
+  const buys = db.moves.filter(m => m.type === "compra" && m.productId === id).sort(byDate);
+  const sells = db.moves.filter(m => m.type === "venta" && m.productId === id).sort(byDate);
+  const units = buys.reduce((a,m) => a + m.qty, 0);
+  const spent = buys.reduce((a,m) => a + m.qty * m.unit, 0);
+  const prices = buys.map(m => m.unit);
+  const pick = v => v === null ? "—" : fmt(v);
+  const tile = (l, v) => `<div class="card tile"><div class="label">${l}</div><div class="val">${v}</div></div>`;
+  $("#cmp-tiles").innerHTML =
+    tile("Compra más barata", pick(prices.length ? Math.min(...prices) : null)) +
+    tile("Compra más cara", pick(prices.length ? Math.max(...prices) : null)) +
+    tile("Última compra", pick(prices.length ? prices[prices.length-1] : null)) +
+    tile("Promedio ponderado", pick(units > 0 ? spent / units : null)) +
+    tile("Precio de venta", fmt(db.products.find(p => p.id === id).price)) +
+    tile("Última venta", pick(sells.length ? sells[sells.length-1].unit : null));
+  if (!buys.length) { $("#cmp-table").innerHTML = '<p class="empty">Este producto todavía no tiene compras registradas.</p>'; return; }
+  const rows = buys.map((m, i) => {
+    const prev = i > 0 ? buys[i-1].unit : null;
+    const v = prev > 0 ? (m.unit - prev) / prev * 100 : null;
+    const vt = v === null ? "—" : (v > 0 ? "+" : "") + v.toFixed(1) + " %";
+    return `<tr><td>${esc(m.date)}</td><td>${esc(m.note) || "—"}</td>
+      <td class="num">${num(m.qty)}</td><td class="num">${fmt(m.unit)}</td><td class="num">${vt}</td></tr>`;
+  }).join("");
+  $("#cmp-table").innerHTML = `<table><thead><tr>
+    <th>Fecha</th><th>Proveedor / nota</th><th class="num">Cantidad</th><th class="num">Costo unitario</th><th class="num">Vs. compra anterior</th>
+    </tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function renderExport(){
+  $("#exp").value = JSON.stringify({version:1, exportedAt:new Date().toISOString(), products:db.products, moves:db.moves, seq:db.seq}, null, 2);
+}
+
+function renderAll(){
+  $("#persist").hidden = persisted;
+  $("#persist").textContent = "Este navegador no permite guardar datos. Copia una copia de respaldo en Datos antes de cerrar.";
+  renderSummary(); renderProducts(); renderMoveForm(); renderMoves(); renderCompare();
+}
+
+function updateProduct(id, field, value){
+  const p = db.products.find(x => x.id === id);
+  if (!p) return;
+  p[field] = value; save();
+}
+function importData(){
+  let d;
+  try { d = JSON.parse($("#imp").value); } catch (e) { return notice("El texto no es JSON válido."); }
+  if (!valid(d)) return notice("Faltan la lista de productos o la de movimientos.");
+  const ids = new Set(d.products.map(p => p.id));
+  if (d.moves.some(m => !ids.has(m.productId))) return notice("Hay movimientos de productos que no están en la lista.");
+  const prev = db;
+  db = {products:d.products, moves:d.moves, seq:Math.max(d.seq || 0, ...d.moves.map(m => m.seq || 0))};
+  const r = replay(db.moves);
+  if (r.error) { db = prev; return notice(r.error); }
+  $("#imp").value = "";
+  save(); notice("Datos importados.");
+}
+
+function armed(btn, action){
+  if (btn.dataset.armed) { action(); return; }
+  btn.dataset.armed = "1";
+  const old = btn.textContent;
+  btn.textContent = "Confirmar";
+  setTimeout(() => { if (btn.isConnected) { delete btn.dataset.armed; btn.textContent = old; } }, 4000);
+}
+
+function showTab(name){
+  document.querySelectorAll("[data-tab]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.tab === name)));
+  document.querySelectorAll("main > section").forEach(s => { s.hidden = s.id !== "sec-" + name; });
+  if (name === "datos") renderExport();
+}
+
+/* Events */
+document.addEventListener("click", e => {
+  const tab = e.target.closest("[data-tab]");
+  if (tab) { showTab(tab.dataset.tab); return; }
+  const b = e.target.closest("[data-act]");
+  if (!b) return;
+  const id = b.dataset.id;
+  if (b.dataset.act === "delmove") {
+    armed(b, () => { const err = removeMove(id); notice(err || "Movimiento borrado."); });
+  } else if (b.dataset.act === "delprod") {
+    armed(b, () => {
+      if (db.moves.some(m => m.productId === id)) return notice("Este producto tiene movimientos; no se puede borrar.");
+      db.products = db.products.filter(p => p.id !== id); save(); notice("Producto borrado.");
+    });
+  }
+});
+document.addEventListener("change", e => {
+  const t = e.target;
+  if (t.dataset && t.dataset.f) {
+    const v = Number(t.value);
+    if (!(v >= 0)) { notice("Escribe un número mayor o igual a cero."); renderAll(); return; }
+    updateProduct(t.dataset.id, t.dataset.f === "price" ? "price" : "min", v);
+    notice("Actualizado.");
+  }
+});
+$("#m-type").addEventListener("change", renderMoveForm);
+$("#cmp-prod").addEventListener("change", renderCompare);
+
+$("#f-prod").addEventListener("submit", e => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  const name = String(f.get("name") || "").trim();
+  const price = Number(f.get("price")), min = Number(f.get("min"));
+  if (!name) return notice("Escribe el nombre del producto.");
+  if (!(price >= 0) || !(min >= 0)) return notice("El precio y el mínimo deben ser cero o mayores.");
+  if (db.products.some(p => p.name.toLowerCase() === name.toLowerCase())) return notice("Ya existe un producto con ese nombre.");
+  db.products.push({id:uid(), name, unit:String(f.get("unit") || "").trim(), price, min});
+  e.target.reset();
+  save(); notice("Producto agregado.");
+});
+
+$("#f-move").addEventListener("submit", e => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  const type = f.get("type");
+  const productId = f.get("product");
+  const qty = Number(f.get("qty"));
+  const price = Number(f.get("price") || 0);
+  const date = String(f.get("date") || "");
+  const note = String(f.get("note") || "").trim();
+  if (!productId || !db.products.some(p => p.id === productId)) return notice("Elige un producto. Si no hay ninguno, crea uno primero.");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return notice("Escribe una fecha válida.");
+  if (type === "ajuste" ? !(qty >= 0) : !(qty > 0)) return notice(type === "ajuste" ? "El stock contado debe ser cero o mayor." : "La cantidad debe ser mayor que cero.");
+  if (type !== "ajuste" && !(price >= 0)) return notice("El precio debe ser cero o mayor.");
+  const err = addMove({type, productId, qty, unit: type === "ajuste" ? 0 : price, date, note});
+  if (err) return notice(err);
+  e.target.querySelector('[name="qty"]').value = "";
+  e.target.querySelector('[name="price"]').value = "";
+  e.target.querySelector('[name="note"]').value = "";
+  notice("Movimiento guardado.");
+});
+
+$("#copy").addEventListener("click", async () => {
+  const ta = $("#exp");
+  try { await navigator.clipboard.writeText(ta.value); notice("Copiado."); }
+  catch (e) { ta.focus(); ta.select(); notice("Selecciona el texto y cópialo a mano."); }
+});
+$("#imp-btn").addEventListener("click", function(){ armed(this, importData); });
+
+/* Start */
+$("#m-date").value = today();
+showTab("resumen");
+renderAll();
+</script>
